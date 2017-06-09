@@ -25,15 +25,13 @@
 %%%%%%%%%%%%%%051617%%%%%%%%%%%%%%%%%%%%%%%%
 % The folder containing interferogram should contain ONLY interferograms,
 % not any other subfolders for the code to work.
+%
+%
+%
 %%%%%%%%%%%%%%%052517%%%%%%%%%%%%%%%%%%%%%%
 % -put the meshsize part into initializtion 
-%%%%%%%%%%%%%%%060817%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
-%
-%
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-%%
 % path = 'E:\Documents\Research\Ellis\MGRIN\Data\';
 
 
@@ -60,10 +58,13 @@
 
 %% This is where all the inititialization variables are defined
 clear; clc; close all;
-path(path,'/Users/zhouyuanying/Documents/Thermal') %add analysis functions in path
-temploc = '/Users/zhouyuanying/Documents/Thermal/xls/TMB01033.XLS'; %temperature file location of Omega measurements
+path(path,'C:\Users\Chopin\OneDrive\espec_thermal\thermal_toolbox') %add analysis functions in path
+temploc = 'F:\TMB01033.XLS'; %temperature file location of Omega measurements
+if (exist('TempLog.txt')) 
+    delete('TempLog.txt');
+end
 
-% This setting determines the kind of test. A value of 1 will ask for
+% This setting determines the kind of test. A envalue of 1 will ask for
 % information about the corrsponding region. Ex. Set FlagTransmit = 0 if
 % you are only interested in the CTE of a sample.
 
@@ -124,7 +125,7 @@ numPhaseMaps = length(find(~[Ph.isdir])); %%why minus 1? try not to
 load(Ph(3).name) % why starting from 3? because the first two are name, '.' and '..')
 %phasetemp= PhaseMapfromsnap(snap);
 
-DataDisplay = figure(45);
+DataDisplay = figure(49);
 figure(DataDisplay)
 imagesc(phasetemp);
 colormap summer
@@ -132,7 +133,10 @@ axis equal
 hold on
 title('Data Selection Regions')
 
-%%
+% Pick up the region you want to analyze: Background , Reflection, Transmission
+% Number of the files which are not the data files. May come from the
+% system 
+other = 0;
 % Grab and display the background region
 disp('Currently Selecting Background Region...')
 coordsB = DefineRegion(phasetemp,1)
@@ -166,10 +170,15 @@ cd ..
 saveas(gcf,'datasetup','png')
 cd(phasedir)
 
-%% Now we go and grab the pixels that we're interested in
+% Now we go and grab the pixels that we're interested in
 clear Bcube Rcube Tcube
 
-for i = 1:numPhaseMaps
+% Can we have     Bcube = phasetemp(coordsB(2):Bmesh:coordsB(2)+coordsB(4)-1 ...
+%        ,   coordsB(1):Bmesh:coordsB(1)+coordsB(3)-1,:);
+
+
+
+for i = 1:numPhaseMaps-other
     load(Ph(i+2).name); %load snap
     i %display progress
     %phasetemp = PhaseMapfromsnap(snap); %calculate phasemap
@@ -216,27 +225,74 @@ Time = Time - Time(startIndex);
 DS.Time = Time';
 
 %% Unwrap all of the data (this should be replaced with the pumaho algorithm ?)
+% and extract tilt
+%please enter the mesh size which you want to use in fit
+fit_mesh=10; %spacing between tilt data points
 
+clear B_X B_Y B_fit R_X R_Y R_fit T_X T_Y T_fit Bcube_tilt Rcube_tilt Tcube_tilt 
+clear fB fR fT
+disp('processing Background')
 % make the phasemap continuousm,same as following
-BcubeUnwrapped = unwrap(Bcube,[],3);
+BcubeUnwrapped = unwrap(unwrap(unwrap(Bcube),[],2),[],3);
 % extract the tilt, we care about the phase difference,same as following
-Bcubezero = bsxfun(@minus,BcubeUnwrapped,BcubeUnwrapped(:,:,startIndex));
+%Bcubezero = bsxfun(@minus,BcubeUnwrapped,BcubeUnwrapped(:,:,startIndex));
+[Bn,Bm,~] = size(BcubeUnwrapped);
+%set up the fit data
+B_fit.data=BcubeUnwrapped(1:fit_mesh:end,1:fit_mesh:end,1);
+[B_X,B_Y] = meshgrid(1:fit_mesh:Bm,1:fit_mesh:Bn);
+B_fit.plot=[B_Y(:),B_X(:),B_fit.data(:)]
+%fB: function after fitting;
+%fotfB: structure include fitting stats
+[fB,fotfB] = fit([B_fit.plot(:,1),B_fit.plot(:,2)],B_fit.plot(:,3),'poly11');  
+for i=1:Bm
+    Bcube_tilt(1:Bn,i)=fB(1:Bn,i);
+end
+%extract tilt!
+Bcubezero = bsxfun(@minus,BcubeUnwrapped,Bcube_tilt);
 DS.Background = Bcubezero;
-[Bn,Bm,~] = size(DS.Background);
+disp('Background rsquare fit:')
+disp(fotfB.rsquare)
+disp('Background Done')
 
+disp('processing Reflection zone')
 if FlagReflect == 1
-    RcubeUnwrapped = unwrap(Rcube,[],3);
+    RcubeUnwrapped = unwrap(unwrap(unwrap(Rcube),[],2),[],3);
+    [Rn,Rm,~] = size(RcubeUnwrapped);
+    R_fit.data=RcubeUnwrapped(1:fit_mesh:end,1:fit_mesh:end,1);
+    [R_X,R_Y] = meshgrid(1:fit_mesh:Rm,1:fit_mesh:Rn);
+    R_fit.plot=[R_Y(:),R_X(:),R_fit.data(:)]
+    [fR,fotfR] = fit([R_fit.plot(:,1),R_fit.plot(:,2)],R_fit.plot(:,3),'poly11');
+    for i=1:Rm
+        Rcube_tilt(1:Rn,i)=fR(1:Rn,i);
+    end
     % Sets the first entry in the cube to be 0
-    Rcubezero = bsxfun(@minus,RcubeUnwrapped,RcubeUnwrapped(:,:,startIndex));
+    Rcubezero = bsxfun(@minus,RcubeUnwrapped,Rcube_tilt);
     DS.Reflect = Rcubezero;
-    [Rn,Rm,~] = size(DS.Background);
+    
 end
+disp('Reflection zone rsquare fit:')
+disp(fotfR.rsquare)
+disp('Reflection zone done')
+
+disp('processing Transmission zone')
 if FlagTransmit == 1
-    TcubeUnwrapped = unwrap(Tcube,[],3);
-    Tcubezero = bsxfun(@minus,TcubeUnwrapped,TcubeUnwrapped(:,:,startIndex));
-    DS.Transmit = Tcubezero;
-    [Tn,Tm,~] = size(DS.Background);
+    TcubeUnwrapped = unwrap(unwrap(unwrap(Tcube),[],2),[],3);
+    [Tn,Tm,~] = size(TcubeUnwrapped);
+    T_fit.data=TcubeUnwrapped(1:fit_mesh:end,1:fit_mesh:end,1);
+    [T_X,T_Y] = meshgrid(1:fit_mesh:Tm,1:fit_mesh:Tn);
+    T_fit.plot=[T_Y(:),T_X(:),T_fit.data(:)]
+    [fT,fotfT] = fit([T_fit.plot(:,1),T_fit.plot(:,2)],T_fit.plot(:,3),'poly11');
+    for i=1:Tm
+        Tcube_tilt(1:Tn,i)=fT(1:Tn,i);
+    end
+    % Sets the first entry in the cube to be 0
+    %Tcubezero = TcubeUnwrapped(:,:,startIndex)- Tcube_tilt;
+    Tcubezero = bsxfun(@minus,TcubeUnwrapped,Tcube_tilt);
+    DS.Transmit = Tcubezero;  
 end
+disp('Transmission zone rsquare fit:')
+disp(fotfT.rsquare)
+disp('Transmission zone done')
 % The DataSet structure is useful for storing information about the test,
 % along with the processed data from it. At the end of the session, you
 % will only need to save this variable
@@ -258,10 +314,14 @@ disp('unwrap done')
 % WARNING: Ensure that the only data in the file is from the test you just
 % performed. The section can only be used in 2 modes: 4 probes or 12 probes
 
-xlsdata = GrabTemp2(Ph(8276).name,4); %temploc is the xls file location of Omega measurements
-Th.Time = xlsdata(:,1); %Th stands for raw thermal data structure.
-Th.Temps = xlsdata(:,2:end);
+xlsdata = GrabTemp2(temploc,4); %temploc is the xls file location of Omega measurements
 
+Th.Time = xlsdata(1:41,1); %for testing purpose
+Th.Temps = xlsdata(1:41,2:end);
+
+% Th.Time = xlsdata(:,1); %Th stands for raw thermal data structure.
+% Th.Temps = xlsdata(:,2:end);
+disp(['end time difference [s]: ',num2str((Th.Time(end,1)-Th.Time(1,1))*86400-DS.Time(end))]);
 rawtime = (Th.Time(:,1)-Th.Time(1,1))*24;
 
 figure(44)
@@ -281,22 +341,14 @@ cd(phasedir)
 % In this section we interpolate the temperature data to match the rate of
 % phase map acquisition. 
 
-Thtimeelapse = (Th.Time(:,1)-Th.Time(1,1))*86400; % The elapsed time in thermal measurements in second
-% p1temp = Th.Temps(:,1);
-% p2temp
-% p3temp
-% p4temp
-
-% 
-% offset = etime(TempBegin,tref)
-% timeDiff = offset:pollrate:offset+pollrate*(numTempPts-1);
+timetab = (Th.Time(:,1)-Th.Time(1,1))*86400; % The elapsed time in thermal measurements in second
 
 % Based on the way the .xls file is written, this will arrange
 % temperature measurements from each thermocouple into a matrix. The
 % nth row of temp matches T(n) where T is the time that the measurement
 % was taken.
 
-ptemp_interp = interp1(Thtimeelapse,Th.Temps,DS.Time);
+temp_interp = interp1(timetab,Th.Temps,DS.Time);
 
 % figure;
 % plot(DS.Time,'linewidth',2)
@@ -306,41 +358,23 @@ ptemp_interp = interp1(Thtimeelapse,Th.Temps,DS.Time);
 % legend('Probe1','Probe2','Probe3','Probe4','Location','northwest')
 % grid on
 
-timetab = Thtimeelapse;
-TAtab = Th.Temps(:,1) % Ambient
-TStab = (Th.Temps(:,2)+Th.Temps(:,3)+Th.Temps(:,4))./3 % Sample
-nairtab = air_index_calc(TAtab,Ptab,RHtab,.6328);
-% Bcube Rcube Tcube
-
-f1 =3;%%3;%15201%13502%11501%09501%7501%4992%3201%0003;%%%%3001%0001
-f2 =length(idx);%45003;%65263;%78248;%63;%size(time_PMS,2);%length(time_PMS);%16942%15200%13501%11500%9500%7500%4991%3200;%%%%6100%3000
-tic
-for frame = f1:1:f2;%f2; %4:10;%26493%length(idx)
-    frame
-    PM = Ph(frame).name;
-%     load(PM);
-    clear phasetemp_unfil phasetemp_fft phasetemp_combo
-    time = DS.Time;
-    TAmeas(frame-f1+1) = interp1(timetab,TAtab,time(frame-f1+1));%,'cubic','extrap'); %interpolate temperature data (every 5s) to match phasemap acquisition rate(2 per s) 
-    TSmeas(frame-f1+1) = interp1(timetab,TStab,time(frame-f1+1));%,'cubic','extrap');
-%         TS_20mm_tab(frame-f1+1) = interp1(timetab,TS_20mm_tab,time(frame-f1+1));
-    RHmeas(frame-f1+1) = RHtab;% you can change in the first section
-    nair(frame-f1+1) = interp1(timetab,nairtab,time(frame-f1+1));%,'cubic','extrap');
-end
-
+TA_interped = temp_interp(:,1); % Ambient
+TS_interped = (temp_interp(:,2)+temp_interp(:,3)+temp_interp(:,4))./3; % Sample
+nairtab = air_index_calc(TA_interped,Ptab,RHtab,.6328);
 
 SecTime=DS.Time/3600; % in hour
+DS.Temps = TS_interped;
 
 figure;
-plot(SecTime,TAmeas,SecTime,TSmeas,'linewidth',2)
+plot(SecTime,TA_interped,SecTime,TS_interped,'linewidth',2)
 xlabel('Time, [h]')
 ylabel('Temp, [\circC]')
 set(gca,'fontsize', 18)
 legend('Ambient','Sample','Location','northwest')
 grid on
 
-DS.Temps = TSmeas;
-% DS.Time;
+
+
 
 %% deviation of the background pixels over time, the "width" of the curve is the deviation of the background
 
@@ -349,7 +383,7 @@ DS.Temps = TSmeas;
 % time to plot!
 
 %you may now input the pixel pitch
-pixel=5;
+pixel=10;
 
 figure(43)
 hold on
@@ -358,7 +392,7 @@ for i = 1:pixel:coordsB(3)
         plot(squeeze(DS.Background(j,i,:))/DS.Wavenumber)
     end
 end
-xlabel('Time')
+xlabel('Time[s]')
 ylabel('Total Optical Path Change [\mu m]')
 grid on
 
@@ -372,7 +406,8 @@ grid on
 % on the size of the regions you are using.
 
 % Calculate standard deviation of the mean instead of standard deviation
-for i = 1:DS.numphasemaps-1
+clear i
+for i = 1:DS.numphasemaps-other
     Berror(i) = std2(DS.Background(:,:,i)/DS.Wavenumber)/sqrt(Bn*Bm);
     Rerror(i) = std2(DS.Reflect(:,:,i)/DS.Wavenumber)/sqrt(Rn*Rm);
     Terror(i) = std2(DS.Transmit(:,:,i)/DS.Wavenumber)/sqrt(Tn*Tm);
@@ -397,7 +432,7 @@ grid on
 
 %% Averages the pixels together to form the path lengths that you will use
 
-for i = 1:DS.numphasemaps-1
+for i = 1:DS.numphasemaps-other
     DS.BOPD(i) = mean2(DS.Background(:,:,i))./DS.Wavenumber;
     if FlagReflect == 1;
         DS.ROPD(i) = mean2(DS.Reflect(:,:,i))./DS.Wavenumber;
@@ -416,7 +451,8 @@ end
 %tend = 1500;
 
 
-DS.dL = -.5*(DS.ROPD-DS.BOPD)./nair;
+DS.dL = -.5*(DS.ROPD-DS.BOPD)'; %air?
+
 %This is the thickness change of the sample in um.
 
 figure(40)
@@ -434,7 +470,7 @@ plot(DS.Temps,DS.Temps.*DS.ctefit(1)+ DS.ctefit(2),'r--','linewidth',2)
 
 rsquared_CTE = 1 - DS.ctefitstats.normr^2 / norm(DS.dL-mean(DS.dL))^2;
 
-legend('Measured Thickness Change',['Linear Fit, r^2 = ',num2str(rsquared)])
+legend('Measured Thickness Change',['Linear Fit, r^2 = ',num2str(rsquared_CTE)])
 set(gca,'FontSize',14)
 
 
@@ -511,5 +547,5 @@ plot(DS.Temps,DS.Temps.*DS.dndTfit(1)+ DS.dndTfit(2),'r--','linewidth',2)
 
 rsquared_dndT = 1 - DS.dndTfitstats.normr^2 / norm(DS.dn-mean(DS.dn))^2;
 
-legend('Measured Index Change',['Linear Fit, r^2 = ',num2str(rsquared)])
+legend('Measured Index Change',['Linear Fit, r^2 = ',num2str(rsquared_dndT)])
 set(gca,'FontSize',14)
