@@ -42,7 +42,7 @@ time_bnd = time(startframe:endframe);
 
 % t0=3479.8;%3000;
 t0=5144;
-n0=1.7659;
+n0=1.4329;
 
 
 % dOPD2_bnd=dOPD2_bnd.*.987;
@@ -95,7 +95,7 @@ figure(78)
 
 subplot(1,2,1)
 start2 = 2000;%
-end2 = 11000;
+end2 = 14000;
 xtilt_bnd=xtilt_bnd(start2:end2);
 ytilt_bnd=ytilt_bnd(start2:end2);
 dOPD1_bnd=dOPD1_bnd(start2:end2);

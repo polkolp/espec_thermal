@@ -1,37 +1,4 @@
- close(figure(67));figure(67);
- hold on
- subplot(2,2,1)
- for pixels = what_bg_pxls;
-     hold on
-     plot(bgphaseuw_shft(:,pixels),'g');
- end
- plot(mean(bgphaseuw_shft(:,bg_ww),2),'k')
- grid on
-%  xlim([580 4400]);
-%  legend(['1','2','3','4','5'])
- clear pixels
- xlim([aaa bbb])
- 
- subplot(2,2,2)
- for pixels = what_ref_pxls;
-     hold on
-     plot(refphaseuw_shft(:,pixels),'m');
- end
- plot(mean(refphaseuw_shft(:,ref_ww),2),'k')
- grid on
- clear pixels
- xlim([aaa bbb])
- 
- subplot(2,2,3)
- for pixels = what_trans_pxls;
-     hold on
-     plot(transphaseuw_shft(:,pixels),'r');
- end
- plot(mean(transphaseuw_shft(:,trans_ww),2),'k')
- grid on
- clear pixels
- xlim([aaa bbb])
-%  xlim([580 4400]);
+load('wkspace_tocheckdriv.mat');
  %%
  close(figure(57));figure(57);
  clear what_bg_pxls bg_diff_cnt chk_bg_diff_met chk_bg_diff
@@ -39,10 +6,10 @@
  clear what_trans_pxls trans_diff_cnt chk_trans_diff_met chk_trans_diff
 %  hold on
 
-thrsh_bg=2.88;
-thrsh_ref=2.75;%2.752;%2.96;
-thrsh_trans=2.2;%2.416;
-stopshft = 13300;%40000;
+thrsh_bg=2.05;
+thrsh_ref=2.05;%2.752;%2.96;
+thrsh_trans=1.8;%2.416;
+stopshft = length(xtilt);%40000;
 ofst = 1;%11500;
 
  subplot(3,1,1)
@@ -90,10 +57,46 @@ ofst = 1;%11500;
     end
     clear chk_trans_diff
  end
- plot(chk_trans_diff_met,'ko')
+ plot(chk_trans_diff_met,'ro')
  hold on
- plot(what_trans_pxls,chk_trans_diff_met(what_trans_pxls),'rx')
- plot(what_trans_pxls,chk_trans_diff_met(what_trans_pxls),'ro')
+ plot(what_trans_pxls,chk_trans_diff_met(what_trans_pxls),'kx')
+ plot(what_trans_pxls,chk_trans_diff_met(what_trans_pxls),'ko')
 % %  plot(mean(bgphaseuw_shft(:,1:323),2),'k')
 % %  xlim([990 4400]);
 % %  legend(['1','2','3','4','5'])
+
+%%
+close(figure(67));figure(67);
+ hold on
+ subplot(2,2,1)
+ for pixels = what_bg_pxls;
+     hold on
+     plot(bgphaseuw_shft(:,pixels),'g');
+ end
+ plot(mean(bgphaseuw_shft(:,bg_ww),2),'k')
+ grid on
+%  xlim([580 4400]);
+%  legend(['1','2','3','4','5'])
+ clear pixels
+ xlim([aaa bbb])
+ 
+ subplot(2,2,2)
+ for pixels = what_ref_pxls;
+     hold on
+     plot(refphaseuw_shft(:,pixels),'m');
+ end
+ plot(mean(refphaseuw_shft(:,ref_ww),2),'k')
+ grid on
+ clear pixels
+ xlim([aaa bbb])
+ 
+ subplot(2,2,3)
+ for pixels = what_trans_pxls;
+     hold on
+     plot(transphaseuw_shft(:,pixels),'r');
+ end
+ plot(mean(transphaseuw_shft(:,trans_ww),2),'k')
+ grid on
+ clear pixels
+ xlim([aaa bbb])
+%  xlim([580 4400]);
